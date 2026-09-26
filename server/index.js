@@ -1,18 +1,33 @@
 import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Get current file and folder paths
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// React production build folder
+const frontendPath = path.join(__dirname, "..", "dist");
+
 app.use(cors());
 app.use(express.json());
 
+// ========================================
+// RECIPE API
+// ========================================
+
 app.post("/api/recipe", async (req, res) => {
   try {
-    const ingredients = String(req.body?.ingredients || "").trim();
+    const ingredients = String(
+      req.body?.ingredients || ""
+    ).trim();
 
     if (!ingredients) {
       return res.status(400).json({
@@ -22,7 +37,8 @@ app.post("/api/recipe", async (req, res) => {
 
     if (ingredients.length > 2000) {
       return res.status(400).json({
-        error: "Please keep the ingredient list under 2000 characters."
+        error:
+          "Please keep the ingredient list under 2000 characters."
       });
     }
 
@@ -30,7 +46,7 @@ app.post("/api/recipe", async (req, res) => {
 
     if (!apiKey) {
       return res.status(500).json({
-        error: "GROQ_API_KEY is missing from .env"
+        error: "GROQ_API_KEY is missing from environment variables."
       });
     }
 
@@ -38,10 +54,12 @@ app.post("/api/recipe", async (req, res) => {
       "https://api.groq.com/openai/v1/chat/completions",
       {
         method: "POST",
+
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${apiKey}`
+          Authorization: `Bearer ${apiKey}`
         },
+
         body: JSON.stringify({
           model: "openai/gpt-oss-20b",
 
@@ -51,6 +69,7 @@ app.post("/api/recipe", async (req, res) => {
               content:
                 "You are a helpful cooking assistant. Return only valid JSON."
             },
+
             {
               role: "user",
               content: `
@@ -98,7 +117,6 @@ Make the recipe simple and realistic.
 
     console.log("Groq status:", response.status);
 
-    // Handle Groq API errors
     if (!response.ok) {
       console.error(
         "Groq API error:",
@@ -112,8 +130,8 @@ Make the recipe simple and realistic.
       });
     }
 
-    // Get model response
-    const text = data?.choices?.[0]?.message?.content;
+    const text =
+      data?.choices?.[0]?.message?.content;
 
     console.log("Groq content:", text);
 
@@ -128,21 +146,26 @@ Make the recipe simple and realistic.
       });
     }
 
-    // Convert JSON string into JavaScript object
     let recipe;
 
     try {
       recipe = JSON.parse(text);
     } catch (error) {
-      console.error("JSON parsing error:", error);
-      console.error("Raw response:", text);
+      console.error(
+        "JSON parsing error:",
+        error
+      );
+
+      console.error(
+        "Raw response:",
+        text
+      );
 
       return res.status(502).json({
         error: "Groq returned invalid JSON."
       });
     }
 
-    // Validate recipe
     if (
       !recipe.title ||
       !recipe.description ||
@@ -170,7 +193,10 @@ Make the recipe simple and realistic.
     return res.json(recipe);
 
   } catch (error) {
-    console.error("Server error:", error);
+    console.error(
+      "Server error:",
+      error
+    );
 
     return res.status(500).json({
       error:
@@ -180,12 +206,31 @@ Make the recipe simple and realistic.
   }
 });
 
-// Health check
+// ========================================
+// HEALTH CHECK
+// ========================================
+
 app.get("/api/health", (req, res) => {
   res.json({
     ok: true
   });
 });
+
+// ========================================
+// SERVE REACT FRONTEND
+// ========================================
+
+app.use(express.static(frontendPath));
+
+app.get("*", (req, res) => {
+  res.sendFile(
+    path.join(frontendPath, "index.html")
+  );
+});
+
+// ========================================
+// START SERVER
+// ========================================
 
 app.listen(PORT, () => {
   console.log(
