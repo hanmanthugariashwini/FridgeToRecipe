@@ -41,8 +41,9 @@ export default function App() {
     setRecipe(null);
     setCompleted([]);
 
-    try {
-      const response = await fetch("/api/recipe", {
+    try { const response = await fetch(
+  "https://fridgetorecipe.onrender.com/api/recipe",
+  {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
